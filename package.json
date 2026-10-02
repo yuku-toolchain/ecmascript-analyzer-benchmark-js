@@ -17,7 +17,7 @@
     "tinybench": "^6.2.0",
     "typescript": "^6.0.3",
     "typescript-7": "npm:typescript@^7.0.2",
-    "yuku-analyzer": "^0.15.0"
+    "yuku-analyzer": "^0.15.1"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
