@@ -1,6 +1,7 @@
 import { posix } from "node:path";
 import type { FileSystem } from "typescript-7/unstable/fs";
-import type { Dataset, Lang, SourceFile } from "./datasets.ts";
+import type { Dataset, SourceFile } from "./datasets.ts";
+import { link, type Resolver } from "./link.ts";
 
 /** One analyzer, loaded and ready, possibly with a server process behind it. */
 export interface Session {
@@ -38,8 +39,7 @@ export const ANALYZERS: Analyzer[] = [
       const { Analyzer } = await import("yuku-analyzer");
       return {
         analyze(files) {
-          const resolve = pathsResolver(dataset, files);
-          const analyzer = new Analyzer(resolve ? { resolve } : {});
+          const analyzer = new Analyzer({ resolve: moduleResolver(dataset, files) });
           for (const file of files) {
             analyzer.setFile(file.path, file.source, { lang: file.lang, sourceType: file.sourceType });
           }
@@ -57,10 +57,10 @@ export const ANALYZERS: Analyzer[] = [
     },
   },
   {
-    key: "typescript_7",
-    name: "TypeScript 7",
+    key: "typescript",
+    name: "TypeScript",
     packages: "typescript@7",
-    description: "The TypeScript compiler in Go, through its API.",
+    description: "The TypeScript compiler, written in Go, through its API.",
     url: "https://github.com/microsoft/typescript-go",
     color: "#3A86FF",
     async open(dataset) {
@@ -113,90 +113,27 @@ export const ANALYZERS: Analyzer[] = [
     },
   },
   {
-    key: "typescript_6",
-    name: "TypeScript 6",
-    packages: "typescript@6",
-    description: "The TypeScript compiler in JavaScript, through its compiler API.",
-    url: "https://github.com/microsoft/TypeScript",
-    color: "#4CC9F0",
-    async open(dataset) {
-      const { default: ts } = await import("typescript");
-      const collect = referenceCollector<import("typescript").Node>(ts.SyntaxKind);
-      const scriptKinds: Record<Lang, import("typescript").ScriptKind> = {
-        js: ts.ScriptKind.JS,
-        jsx: ts.ScriptKind.JSX,
-        ts: ts.ScriptKind.TS,
-        tsx: ts.ScriptKind.TSX,
-        dts: ts.ScriptKind.TS,
-      };
-      const options: import("typescript").CompilerOptions = {
-        ...COMPILER_OPTIONS,
-        jsx: ts.JsxEmit.Preserve,
-        target: ts.ScriptTarget.ESNext,
-        module: ts.ModuleKind.ESNext,
-        moduleResolution: ts.ModuleResolutionKind.Bundler,
-        paths: tsconfigPaths(dataset, ""),
-      };
-
-      return {
-        analyze(sources) {
-          const files = new Map(sources.map((source) => [`/${source.path}`, source]));
-          const directories = directoryIndex(files.keys());
-          const host: import("typescript").CompilerHost = {
-            getSourceFile(name, target) {
-              const file = files.get(name);
-              if (!file) return undefined;
-              return ts.createSourceFile(name, file.source, target, false, scriptKinds[file.lang]);
-            },
-            fileExists: (name) => files.has(name),
-            directoryExists: (name) => directories.has(name),
-            getDirectories: (name) => directories.get(name)?.directories ?? [],
-            readFile: (name) => files.get(name)?.source,
-            getDefaultLibFileName: () => "/lib.d.ts",
-            writeFile: () => {},
-            getCurrentDirectory: () => "/",
-            getCanonicalFileName: (name) => name,
-            useCaseSensitiveFileNames: () => true,
-            getNewLine: () => "\n",
-          };
-
-          const program = ts.createProgram([...files.keys()], options, host);
-          const checker = program.getTypeChecker();
-          for (const file of program.getSourceFiles()) {
-            const { references, aliases } = collect(file);
-            for (const node of references) checker.getSymbolAtLocation(node);
-            for (const node of aliases) {
-              const symbol = checker.getSymbolAtLocation(node);
-              if (symbol) checker.getAliasedSymbol(symbol);
-            }
-          }
-          return program;
-        },
-        close() {},
-      };
-    },
-  },
-  {
     key: "typescript_eslint",
     name: "typescript-eslint",
     packages: "@typescript-eslint/typescript-estree + @typescript-eslint/scope-manager",
-    description: "The parser and scope analysis behind typescript-eslint, one file at a time.",
+    description: "The parser and scope analysis behind typescript-eslint, linked across files by the benchmark.",
     url: "https://github.com/typescript-eslint/typescript-eslint/tree/main/packages/scope-manager",
     color: "#7209B7",
-    async open() {
+    async open(dataset) {
       const { parse } = await import("@typescript-eslint/typescript-estree");
       const { analyze } = await import("@typescript-eslint/scope-manager");
       return {
         analyze(files) {
-          return files.map((file) => {
+          const modules = new Map(files.map((file) => {
             const jsx = file.lang === "js" || file.lang === "jsx";
             const ast = parse(file.source, { range: true, filePath: file.path, jsx });
             const manager = analyze(ast, { sourceType: file.sourceType, lib: [] });
             for (const scope of manager.scopes) {
               for (const reference of scope.references) void reference.resolved;
             }
-            return manager;
-          });
+            return [file.path, { ast, manager }];
+          }));
+          return link(modules, moduleResolver(dataset, files));
         },
         close() {},
       };
@@ -226,12 +163,11 @@ const SOURCE_EXTENSIONS: Record<string, string[]> = {
 };
 
 /**
- * Resolves a dataset's module names for Yuku as TypeScript resolves its `paths`, and relative
- * specifiers as Yuku does by default. Null when the dataset maps no names.
+ * Resolves relative specifiers by probing extensions and index files as TypeScript does, and a
+ * dataset's module names as TypeScript resolves its `paths`. Yuku and typescript-eslint share it.
  */
-function pathsResolver(dataset: Dataset, files: readonly SourceFile[]) {
+function moduleResolver(dataset: Dataset, files: readonly SourceFile[]): Resolver {
   const paths = Object.entries(dataset.project?.paths ?? {});
-  if (paths.length === 0) return null;
   const known = new Set(files.map((file) => file.path));
   const root = `projects/${dataset.key}`;
 
@@ -247,7 +183,7 @@ function pathsResolver(dataset: Dataset, files: readonly SourceFile[]) {
     return null;
   };
 
-  return (specifier: string, importer: string): string | false | null => {
+  return (specifier, importer) => {
     if (specifier.startsWith(".")) return probe(posix.join(posix.dirname(importer), specifier));
     for (const [name, targets] of paths) {
       const star = name.indexOf("*");

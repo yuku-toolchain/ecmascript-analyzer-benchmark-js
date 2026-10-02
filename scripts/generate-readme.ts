@@ -218,16 +218,12 @@ const METHODOLOGY_SECTION = `## Methodology
 
 ### The work
 
-Every analyzer builds the semantic model of a whole codebase, the work an editor, linter, or bundler needs from it:
+Every analyzer does the same job on a whole codebase, the job an editor, linter, or bundler needs done:
 
-1. Parse every file.
+1. Parse every file into an AST of JavaScript objects.
 2. Bind its scopes and declarations, with TypeScript's declaration merging and its separate value, type, and namespace spaces.
 3. Resolve every reference to its declaration.
-4. Follow every import and export across files to the declaration it names.
-
-Every analyzer also hands back the whole AST as JavaScript objects, which Yuku otherwise builds only when it is read. Every analyzer gets the same files and options, with no default library, so a global stays unresolved in all of them. Vue and Preact map their package names to source directories, which every analyzer that links imports follows. Yuku reports its references directly. TypeScript has no list of references, so every identifier its own AST places in a reference position is resolved through the checker, which gives the same references as Yuku within 1%.
-
-typescript-eslint analyzes one file at a time and never links imports, so it does less of the work than the others.
+4. Follow every import and re-export across files to the declaration it names.
 
 ### Codebases
 
@@ -235,11 +231,7 @@ Each project is its source directories at a pinned commit, the files its own \`t
 
 ### Measurement
 
-Every analyzer × codebase runs in its own freshly spawned Node.js process, so JIT state and garbage from one never affect another. Timing uses [Tinybench](https://github.com/tinylibs/tinybench), with warmup iterations followed by timed iterations, in 3 independent runs per analyzer. The reported median is the median across those runs, which is robust to GC pauses and scheduling blips. RME is the relative margin of error (99% confidence) within a run.
-
-### TypeScript 7
-
-TypeScript 7 runs in Go, in a server process. It parses and binds a project on several threads in a small part of its total. Most of its time goes to returning the resolved symbols to JavaScript through \`typescript/unstable/sync\`, the API any JavaScript tool reaches it through. Each run opens the project at fresh paths, so the server reuses nothing from an earlier run.`;
+Every analyzer × codebase runs in its own freshly spawned Node.js process, so JIT state and garbage from one never affect another. Timing uses [Tinybench](https://github.com/tinylibs/tinybench), with warmup iterations followed by timed iterations, in 3 independent runs per analyzer. The reported median is the median across those runs, which is robust to GC pauses and scheduling blips. RME is the relative margin of error (99% confidence) within a run.`;
 
 const RUN_SECTION = `## Run the benchmarks
 
