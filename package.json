@@ -1,0 +1,27 @@
+{
+  "name": "ecmascript-analyzer-benchmark-js",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "bench": "node scripts/bench.ts && bun readme",
+    "load-files": "bun scripts/load-files.ts",
+    "readme": "bun scripts/generate-readme.ts",
+    "update-analyzers": "bun update --latest yuku-analyzer typescript-7 && bun update typescript",
+    "type-check": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@typescript-eslint/scope-manager": "^8.71.0",
+    "@typescript-eslint/typescript-estree": "^8.71.0",
+    "chart.js": "^4.5.1",
+    "chartjs-node-canvas": "^5.0.0",
+    "tinybench": "^6.2.0",
+    "typescript": "^6.0.3",
+    "typescript-7": "npm:typescript@^7.0.2",
+    "yuku-analyzer": "^0.15.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "@types/node": "^26.6.3",
+    "@typescript/native-preview": "^7.0.0-dev.20260707.2"
+  }
+}

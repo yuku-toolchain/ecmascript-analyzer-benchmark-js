@@ -1,0 +1,55 @@
+{
+  "dataset": "typescript",
+  "files": 77,
+  "bytes": 9400075,
+  "langs": [
+    "ts"
+  ],
+  "runtime": "Node.js v24.14.1",
+  "results": [
+    {
+      "key": "yuku",
+      "name": "Yuku",
+      "median": 205.85708349999913,
+      "mean": 206.4466510156251,
+      "min": 201.3232909999988,
+      "max": 220.2440830000005,
+      "rme": 0.41053219265640417,
+      "samples": 64,
+      "runs": 1
+    },
+    {
+      "key": "typescript_6",
+      "name": "TypeScript 6",
+      "median": 685.9101250000003,
+      "mean": 688.6665905156256,
+      "min": 671.2448330000007,
+      "max": 798.6334160000042,
+      "rme": 0.6377647950857689,
+      "samples": 64,
+      "runs": 1
+    },
+    {
+      "key": "typescript_7",
+      "name": "TypeScript 7",
+      "median": 823.4603544999954,
+      "mean": 825.0843633125003,
+      "min": 809.8790420000005,
+      "max": 865.830750000001,
+      "rme": 0.28173795040064764,
+      "samples": 64,
+      "runs": 1
+    },
+    {
+      "key": "typescript_eslint",
+      "name": "typescript-eslint",
+      "median": 1264.633458499995,
+      "mean": 1269.6609472812502,
+      "min": 1224.033625,
+      "max": 1356.226583999989,
+      "rme": 0.6342802457323349,
+      "samples": 64,
+      "runs": 1
+    }
+  ]
+}
