@@ -31,26 +31,26 @@ export const ANALYZERS: Analyzer[] = [
   {
     key: "yuku",
     name: "Yuku",
-    packages: "yuku-analyzer",
+    packages: "Yuku Analyzer",
     description: "Computed natively in Zig, in the same pass as the parse.",
     url: "https://github.com/yuku-toolchain/yuku",
     color: "#FF6B35",
     async open(dataset) {
-      const { Analyzer } = await import("yuku-analyzer");
+      const { Project } = await import("yuku");
       return {
         analyze(files) {
-          const analyzer = new Analyzer({ resolve: moduleResolver(dataset, files) });
+          const project = new Project({ resolve: moduleResolver(dataset, files) });
           for (const file of files) {
-            analyzer.setFile(file.path, file.source, { lang: file.lang, sourceType: file.sourceType });
+            project.set(file.path, file.source, { lang: file.lang, sourceType: file.sourceType });
           }
-          analyzer.link();
-          for (const module of analyzer.modules.values()) {
-            void module.ast;
-            void module.scopes;
-            for (const reference of module.references) void reference.binding;
-            for (const entry of module.imports) entry.local?.definition();
+          void project.diagnostics;
+          for (const file of project.files.values()) {
+            void file.program;
+            void file.scopes;
+            for (const reference of file.references) void reference.binding;
+            for (const entry of file.imports) entry.local?.definition();
           }
-          return analyzer;
+          return project;
         },
         close() {},
       };
@@ -212,7 +212,7 @@ type Fields = Partial<Record<"name" | "propertyName" | "expression" | "left" | "
 
 /**
  * Finds the identifiers a TypeScript AST resolves as references, the work Yuku reports as
- * `module.references`, and the names its imports and exports alias, which Yuku links. Both
+ * `file.references`, and the names its imports and exports alias, which Yuku links. Both
  * TypeScript versions share the AST shape, only their kind numbers differ.
  */
 function referenceCollector<Node>(kinds: Record<string, string | number>) {

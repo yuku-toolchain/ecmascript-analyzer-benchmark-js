@@ -1,15 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { arch, cpus, platform, release, totalmem } from "node:os";
 import { join } from "node:path";
-import type { ChartConfiguration } from "chart.js";
-import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 import { ANALYZERS } from "./analyzers.ts";
-import type { DatasetResult } from "./bench.ts";
+import type { AnalyzerResult, DatasetResult } from "./bench.ts";
 import { DATASETS, type Dataset, type Lang } from "./datasets.ts";
 
 const MB = 1024 * 1024;
-const TEXT_COLOR = "#CAC1B0";
-const INSIDE_COLOR = "rgba(255, 255, 255, 0.75)";
 
 const LANG_NAMES: Record<Lang, string> = {
   js: "JavaScript",
@@ -18,14 +14,6 @@ const LANG_NAMES: Record<Lang, string> = {
   tsx: "TSX",
   dts: "declarations",
 };
-
-interface Bar {
-  label: string;
-  value: number;
-  color: string;
-  outside: string;
-  inside: string | null;
-}
 
 function formatMs(ms: number): string {
   const digits = ms < 1 ? 2 : ms < 100 ? 1 : 0;
@@ -40,84 +28,46 @@ function colorOf(key: string): string {
   return ANALYZERS.find((a) => a.key === key)?.color ?? "#888888";
 }
 
-async function renderChart(name: string, bars: Bar[]): Promise<string> {
-  const dpr = 3;
-  const width = 500;
-  const height = bars.length * 24 + 28;
+function textWidth(text: string): number {
+  let em = 0;
+  for (const c of text) em += /[fijlrt\-. ]/.test(c) ? 0.35 : /[A-Zmw]/.test(c) ? 0.75 : 0.58;
+  return Math.ceil(em * 13);
+}
 
-  const maxValue = Math.max(...bars.map((b) => b.value));
-  const rawStep = maxValue / 4;
-  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
-  const step = [1, 2, 2.5, 5, 10].map((s) => s * magnitude).find((s) => s >= rawStep)!;
+async function renderChart(name: string, rows: AnalyzerResult[]): Promise<string> {
+  const width = 640;
+  const barX = Math.max(...rows.map((r) => textWidth(r.name))) + 10;
+  const fastest = rows[0]!.median;
+  const slowest = Math.max(...rows.map((r) => r.median));
+  const bars = rows.map((r, i) => {
+    const y = i * 30;
+    const middle = y + 11;
+    const barEnd = barX + Math.round((r.median / slowest) * (width - barX - 80));
+    const bar = [
+      `<text x="${barX - 10}" y="${middle}" text-anchor="end">${r.name}</text>`,
+      `<rect x="${barX}" y="${y}" width="${barEnd - barX}" height="22" rx="4" fill="${colorOf(r.key)}"/>`,
+      `<text x="${barEnd + 8}" y="${middle}">${formatMs(r.median)}</text>`,
+    ];
+    if (i !== 0) {
+      const ratio = formatRatio(r.median / fastest);
+      bar.push(`<text class="ratio" x="${barEnd - 8}" y="${middle}" text-anchor="end">${ratio}</text>`);
+    }
+    return bar.join("\n  ");
+  });
 
-  const configuration: ChartConfiguration = {
-    type: "bar",
-    data: {
-      labels: bars.map((b) => b.label),
-      datasets: [
-        {
-          data: bars.map((b) => b.value),
-          backgroundColor: bars.map((b) => b.color),
-          borderWidth: 0,
-          barPercentage: 0.75,
-          categoryPercentage: 0.92,
-        },
-      ],
-    },
-    options: {
-      indexAxis: "y",
-      responsive: false,
-      devicePixelRatio: 1,
-      layout: { padding: { right: 75 * dpr, top: 2 * dpr, bottom: 0 } },
-      plugins: { legend: { display: false }, title: { display: false } },
-      scales: {
-        x: { display: false, beginAtZero: true, max: Math.ceil(maxValue / step) * step },
-        y: {
-          grid: { display: false },
-          border: { display: false },
-          ticks: { color: TEXT_COLOR, font: { size: 9 * dpr }, padding: 3 * dpr },
-        },
-      },
-    },
-    plugins: [
-      {
-        id: "value-labels",
-        afterDatasetsDraw(chart) {
-          const ctx = chart.ctx;
-          const meta = chart.getDatasetMeta(0);
-          bars.forEach((bar, i) => {
-            const element = meta.data[i] as unknown as { x: number; y: number; base: number };
-            ctx.save();
-            ctx.textBaseline = "middle";
-            ctx.font = `${9 * dpr}px sans-serif`;
-            ctx.fillStyle = TEXT_COLOR;
-            ctx.textAlign = "left";
-            ctx.fillText(bar.outside, element.x + 8 * dpr, element.y);
-            if (bar.inside !== null) {
-              const outsideWidth = ctx.measureText(bar.outside).width;
-              ctx.font = `${8 * dpr}px sans-serif`;
-              const barWidth = element.x - element.base;
-              const inset = Math.min(8 * dpr, (barWidth - ctx.measureText(bar.inside).width) / 2);
-              if (inset >= 2 * dpr) {
-                ctx.fillStyle = INSIDE_COLOR;
-                ctx.textAlign = "right";
-                ctx.fillText(bar.inside, element.x - inset, element.y);
-              } else {
-                ctx.font = `${9 * dpr}px sans-serif`;
-                ctx.fillText(`· ${bar.inside}`, element.x + 12 * dpr + outsideWidth, element.y);
-              }
-            }
-            ctx.restore();
-          });
-        },
-      },
-    ],
-  };
+  const height = rows.length * 30 - 8;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <style>
+    text { font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; fill: #848d97; dominant-baseline: central; font-variant-numeric: tabular-nums }
+    .ratio { font-size: 12px; fill: #fff }
+  </style>
+  ${bars.join("\n  ")}
+</svg>
+`;
 
-  const canvas = new ChartJSNodeCanvas({ width: width * dpr, height: height * dpr });
   await mkdir("charts", { recursive: true });
-  await writeFile(join("charts", `${name}.png`), await canvas.renderToBuffer(configuration));
-  return `charts/${name}.png`;
+  await writeFile(join("charts", `${name}.svg`), svg);
+  return `charts/${name}.svg`;
 }
 
 async function readResult(dataset: Dataset): Promise<DatasetResult> {
@@ -137,16 +87,7 @@ function describe(result: DatasetResult): string {
 async function datasetSection(dataset: Dataset, result: DatasetResult): Promise<string[]> {
   const rows = [...result.results].sort((a, b) => a.median - b.median);
   const fastest = rows[0]!.median;
-  const chart = await renderChart(
-    dataset.key,
-    rows.map((r, i) => ({
-      label: r.name,
-      value: r.median,
-      color: colorOf(r.key),
-      outside: formatMs(r.median),
-      inside: i === 0 ? null : formatRatio(r.median / fastest),
-    })),
-  );
+  const chart = await renderChart(dataset.key, rows);
 
   return [
     `### [${dataset.title}](${dataset.url})`,
