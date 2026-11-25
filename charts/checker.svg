@@ -4,14 +4,14 @@
     .ratio { font-size: 12px; fill: #fff }
   </style>
   <text x="105" y="11" text-anchor="end">Yuku</text>
-  <rect x="115" y="0" width="34" height="22" rx="4" fill="#FF6B35"/>
-  <text x="157" y="11">32.7 ms</text>
+  <rect x="115" y="0" width="31" height="22" rx="4" fill="#FF6B35"/>
+  <text x="154" y="11">30.3 ms</text>
   <text x="105" y="41" text-anchor="end">TypeScript</text>
-  <rect x="115" y="30" width="282" height="22" rx="4" fill="#3A86FF"/>
-  <text x="405" y="41">272 ms</text>
-  <text class="ratio" x="389" y="41" text-anchor="end">8.33×</text>
+  <rect x="115" y="30" width="287" height="22" rx="4" fill="#3A86FF"/>
+  <text x="410" y="41">280 ms</text>
+  <text class="ratio" x="394" y="41" text-anchor="end">9.23×</text>
   <text x="105" y="71" text-anchor="end">typescript-eslint</text>
   <rect x="115" y="60" width="445" height="22" rx="4" fill="#7209B7"/>
-  <text x="568" y="71">430 ms</text>
-  <text class="ratio" x="552" y="71" text-anchor="end">13.2×</text>
+  <text x="568" y="71">433 ms</text>
+  <text class="ratio" x="552" y="71" text-anchor="end">14.3×</text>
 </svg>
